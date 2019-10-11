@@ -3,17 +3,17 @@ Complete C library for temperature/relative humidity sensor SHT21 based on STM32
 
 ## Example
 
-		// Read temperature from sensor - blocking
-		SHT21_ReadTemp();
+	// Read temperature from sensor - blocking
+	SHT21_ReadTemp();
 
-		// Get converted value
-		f_T = SHT21_GetTemp();
+	// Get converted value
+	f_T = SHT21_GetTemp();
 
-		// Wait
-		delay_ms(10);
+	// Wait
+	delay_ms(10);
 
-		// Read RH from sensor - blocking
-		SHT21_ReadRH();
+	// Read RH from sensor - blocking
+	SHT21_ReadRH();
 
-		// Get converted value
-		f_RH = SHT21_GetRH();
+	// Get converted value
+	f_RH = SHT21_GetRH();
