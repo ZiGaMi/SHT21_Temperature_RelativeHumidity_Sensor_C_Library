@@ -8,7 +8,7 @@
 
 #include "Drivers/I2cDrv.h"
 
-// Init
+// Init pins
 void I2c_Pins_Init(){
 
 	// Enable clock
@@ -29,7 +29,7 @@ void I2c_Pins_Init(){
 
 
 
-// Init periphery
+// Init I2C
 void I2c_Init(){
 
 	// Init pins
@@ -41,16 +41,22 @@ void I2c_Init(){
 	// Enable I2C clock
 	RCC -> APB1ENR |= ( RCC_APB1ENR_I2C1EN );
 
-//	USER_I2C -> TIMINGR = (uint32_t)0x00B01A4B; /* (1) */
+	// Timing calculations according to
 	USER_I2C -> TIMINGR = (uint32_t) ( 0x10805E89 );
-	USER_I2C -> CR1 = I2C_CR1_PE; /* (2) */
-//	USER_I2C -> CR2 = I2C_CR2_AUTOEND | (1 << 16) | (0x40u << 1); /* (3) */
-	USER_I2C -> CR2 = ( I2C_CR2_AUTOEND | (1 << 16) ); //| (0x40u << 1); /* (3) */
+
+	// Enable
+	USER_I2C -> CR1 = I2C_CR1_PE;
+
+	// Enable auto generation of STOP when nbytes are sended
+	USER_I2C -> CR2 = ( I2C_CR2_AUTOEND );
 
 }
 
 
-uint8_t I2c_Write(uint8_t addr, uint8_t data, uint8_t n_byte){
+// Write to device
+uint8_t I2c_Write(uint8_t addr, uint8_t cmd, uint8_t *data, uint8_t n_byte){
+
+	uint8_t i = 0;
 
 	// Write transfer
 	USER_I2C -> CR2 &= ~( I2C_CR2_RD_WRN | I2C_CR2_NBYTES_Msk );
@@ -58,26 +64,37 @@ uint8_t I2c_Write(uint8_t addr, uint8_t data, uint8_t n_byte){
 	// Address (7-bit)
 	USER_I2C -> CR2 |= ((( addr << 1u ) & 0xFEu ) | (( n_byte << I2C_CR2_NBYTES_Pos ) & I2C_CR2_NBYTES_Msk ));
 
-	// Check tx buffer empty
-	if ((USER_I2C -> ISR & I2C_ISR_TXE) == I2C_ISR_TXE )
-	{
-		// Data to send
-		USER_I2C -> TXDR = ( uint8_t ) ( data & 0xFFu );
+	// Data to send
+	USER_I2C -> TXDR = ( uint8_t ) ( cmd & 0xFFu );
 
-		// Send
-		USER_I2C -> CR2 |= ( I2C_CR2_START );
+	// Send
+	USER_I2C -> CR2 |= ( I2C_CR2_START );
+
+	// Check if any of data to transmit at all
+	if ( data != NULL ){
+		for( i = 0; i < ( n_byte - 1u ); i++ )
+		{
+			while(( USER_I2C -> ISR & I2C_ISR_TXE ) != I2C_ISR_TXE );
+			USER_I2C -> TXDR = ( uint8_t ) ( data[i] & 0xFFu );
+		}
 	}
 
-	uint8_t nack = (( USER_I2C -> ISR & I2C_ISR_NACKF ) == I2C_ISR_NACKF );
-	return nack;
+	// Check ack
+	if (( USER_I2C -> ISR & I2C_ISR_NACKF ) == I2C_ISR_NACKF )
+	{
+		return 1;			// No ack
+	}
+	else
+	{
+		return 0;			// Ack
+	}
 }
 
 
-//uint8_t gp_data[10];
-
+// Read from device
 uint8_t* I2c_Read(uint8_t addr, uint8_t n_byte){
 
-	uint8_t nack = 0;
+	uint8_t nack;
 	static uint8_t data[10];
 
 	// Clear number of bytes
@@ -97,13 +114,17 @@ uint8_t* I2c_Read(uint8_t addr, uint8_t n_byte){
 		data[i] = ( USER_I2C -> RXDR );
 	}
 
-	//nack = (( USER_I2C -> ISR & I2C_ISR_NACKF ) == I2C_ISR_NACKF );
-	//return nack;
-	return ( uint8_t* ) ( &data );
+
+	// Check for nack
+	nack = (( USER_I2C -> ISR & I2C_ISR_NACKF ) == I2C_ISR_NACKF );
+
+	if ( 1 == nack )
+	{
+		return NULL;
+	}
+	else
+	{
+		return ( uint8_t* ) ( &data );
+	}
 }
 
-/*
-uint8_t* I2c_GetRxData(){
-	return ( uint8_t* ) ( &gp_data );
-}
-*/
